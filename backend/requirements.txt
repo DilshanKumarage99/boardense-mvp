@@ -12,6 +12,7 @@ google-auth-oauthlib==1.1.0
 google-api-python-client==2.102.0
 python-docx==0.8.11
 PyPDF2==3.0.1
+python-pptx==0.6.23
 openai==0.27.8
 # langchain removed for Windows dev to avoid heavy native deps (numpy/build tools).
 # Add langchain later in a Linux/conda environment or when wheels are available.

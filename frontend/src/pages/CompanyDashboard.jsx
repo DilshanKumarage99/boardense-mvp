@@ -11,14 +11,15 @@ export default function CompanyDashboard() {
 
   const [company, setCompany] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [selectedDocs, setSelectedDocs] = useState([]);
   const [analyses, setAnalyses] = useState([]);
-  // multi-file/group upload state
-  const [groups, setGroups] = useState([]); // { type: string, files: File[] }
   const [currentFiles, setCurrentFiles] = useState([]);
   const [documentType, setDocumentType] = useState('board_deck');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [summary, setSummary] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null); // {id, filename, content_extracted, content_summary}
+  const [summarizing, setSummarizing] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -30,7 +31,13 @@ export default function CompanyDashboard() {
     try {
       const response = await axios.get(`/api/companies/${companyId}`);
       setCompany(response.data);
-      setDocuments([]);
+      // Fetch documents for the company so extracted items persist across navigation
+      try {
+        const docsRes = await axios.get(`/api/documents/companies/${companyId}/list`);
+        setDocuments(docsRes.data || []);
+      } catch (e) {
+        setDocuments([]);
+      }
       setAnalyses([]);
     } catch (err) {
       console.error('Error fetching company data:', err);
@@ -40,31 +47,52 @@ export default function CompanyDashboard() {
     }
   };
 
+  const handleDeleteDocument = async (docId) => {
+    if (!window.confirm('Delete this extracted document?')) return;
+    try {
+      await axios.delete(`/api/documents/${docId}`);
+      setDocuments((prev) => prev.filter(d => d.id !== docId));
+      alert('Document deleted');
+    } catch (err) {
+      alert('Delete failed: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const toggleSelectDoc = (docId) => {
+    setSelectedDocs((prev) => {
+      if (prev.includes(docId)) return prev.filter(id => id !== docId);
+      return [...prev, docId];
+    });
+  };
+
+  const selectAllDocs = () => {
+    if (selectedDocs.length === documents.length) {
+      setSelectedDocs([]);
+    } else {
+      setSelectedDocs(documents.map(d => d.id));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedDocs.length === 0) return;
+    if (!window.confirm(`Delete ${selectedDocs.length} selected document(s)?`)) return;
+    try {
+      const res = await axios.post('/api/documents/delete-batch', { document_ids: selectedDocs });
+      const deleted = res.data.deleted || [];
+      setDocuments((prev) => prev.filter(d => !deleted.includes(d.id)));
+      setSelectedDocs([]);
+      alert(`Deleted ${deleted.length} document(s)`);
+    } catch (err) {
+      alert('Batch delete failed: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   const handleSelectFiles = (e) => {
     setCurrentFiles(Array.from(e.target.files || []));
   };
 
-  const handleAddGroup = () => {
-    if (!currentFiles.length) return;
-    setGroups((prev) => [...prev, { type: documentType, files: currentFiles }]);
-    setCurrentFiles([]);
-  };
-
-  const removeFileFromGroup = (gIdx, fIdx) => {
-    setGroups((prev) => {
-      const copy = JSON.parse(JSON.stringify(prev));
-      copy[gIdx].files.splice(fIdx, 1);
-      if (copy[gIdx].files.length === 0) copy.splice(gIdx, 1);
-      return copy;
-    });
-  };
-
-  const removeGroup = (gIdx) => {
-    setGroups((prev) => prev.filter((_, i) => i !== gIdx));
-  };
-
-  const handleUploadAndAnalyzeAll = async () => {
-    if (groups.length === 0) {
+  const handleUploadAndExtractAll = async () => {
+    if (currentFiles.length === 0) {
       alert('No files to upload.');
       return;
     }
@@ -72,11 +100,9 @@ export default function CompanyDashboard() {
     setUploading(true);
     try {
       const formData = new FormData();
-      groups.forEach((group) => {
-        group.files.forEach((file) => {
-          formData.append('files', file);
-          formData.append('types', group.type);
-        });
+      currentFiles.forEach((file) => {
+        formData.append('files', file);
+        formData.append('types', documentType);
       });
 
       const uploadRes = await axios.post(
@@ -87,24 +113,7 @@ export default function CompanyDashboard() {
 
       const uploadedDocs = uploadRes.data;
       setDocuments((prev) => [...prev, ...uploadedDocs]);
-
-      const docIds = uploadedDocs.map((d) => d.id);
-      const analyzeRes = await axios.post(
-        `/api/analysis/companies/${companyId}/analyze-batch`,
-        { document_ids: docIds }
-      );
-
-      setAnalyses((prev) => [...prev, ...analyzeRes.data.analyses]);
-
-      setSummary({
-        groups: groups.map((g) => ({ type: g.type, files: g.files.map((f) => f.name) })),
-        total_files: uploadedDocs.length,
-        aggregated: analyzeRes.data.summary || null,
-      });
-
-      setGroups([]);
       setCurrentFiles([]);
-      alert('Upload & analysis complete!');
     } catch (err) {
       console.error(err);
       alert('Upload/Analysis failed: ' + (err.response?.data?.error || err.message));
@@ -165,15 +174,8 @@ export default function CompanyDashboard() {
 
             <div className="mb-4 flex gap-2">
               <button
-                onClick={handleAddGroup}
-                disabled={!currentFiles.length}
-                className="flex-1 bg-brand-orange text-white font-semibold py-2 rounded hover:bg-brand-orange-dark disabled:opacity-50"
-              >
-                Add files under this type
-              </button>
-              <button
                 onClick={() => { setCurrentFiles([]); }}
-                className="px-4 py-2 border rounded"
+                className="px-4 py-2 border rounded w-full"
               >
                 Clear
               </button>
@@ -181,62 +183,76 @@ export default function CompanyDashboard() {
 
             <div className="mb-4">
               <button
-                onClick={handleUploadAndAnalyzeAll}
-                disabled={groups.length === 0 || uploading}
+                onClick={handleUploadAndExtractAll}
+                disabled={currentFiles.length === 0 || uploading}
                 className="w-full bg-green-600 text-white font-semibold py-2 rounded hover:bg-green-700 disabled:opacity-50"
               >
-                {uploading ? 'Processing...' : 'Analyze & Summarize All'}
+                {uploading ? 'Processing...' : 'Extract All'}
               </button>
             </div>
           </div>
 
           {/* Main Content */}
           <div className="md:col-span-2 space-y-8">
-            {/* Upload Groups Preview */}
-            <div className="bg-white rounded-lg shadow-lg p-6 text-left">
-              <h2 className="text-2xl font-bold mb-4 flex items-center justify-start gap-2"><FaFileAlt /> Upload Groups</h2>
-              {groups.length === 0 ? (
-                <p className="text-gray-500">No groups created yet. Select files and click "Add files under this type".</p>
-              ) : (
-                <div className="space-y-3">
-                  {groups.map((g, gi) => (
-                    <div key={gi} className="p-4 border border-gray-200 rounded">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-semibold">Type: {g.type}</p>
-                          <p className="text-sm text-gray-600">{g.files.length} file(s)</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => removeGroup(gi)} className="text-sm px-2 py-1 border rounded">Remove Group</button>
-                        </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {g.files.map((f, fi) => (
-                          <div key={fi} className="p-2 border rounded flex justify-between items-center">
-                            <div>
-                              <p className="font-medium">{f.name}</p>
-                              <p className="text-xs text-gray-500">{f.type || f.name.split('.').pop()}</p>
-                            </div>
-                            <button onClick={() => removeFileFromGroup(gi, fi)} className="text-sm px-2 py-1 border rounded">Remove</button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
             {/* Documents */}
             <div className="bg-white rounded-lg shadow-lg p-6 text-center">
-              <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2"><FaFileAlt /> Documents</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold flex items-center gap-2"><FaFileAlt /> Documents</h2>
+                <div className="flex items-center gap-3">
+                  <label className="text-sm flex items-center gap-2">
+                    <input type="checkbox" onChange={selectAllDocs} checked={selectedDocs.length === documents.length && documents.length>0} />
+                    <span>Select All</span>
+                  </label>
+                  <button
+                    onClick={handleDeleteSelected}
+                    disabled={selectedDocs.length === 0}
+                    className="px-3 py-1 border rounded text-red-600 disabled:opacity-50"
+                  >
+                    Delete Selected
+                  </button>
+                </div>
+              </div>
               {documents.length === 0 ? (
                 <p className="text-gray-500">No documents uploaded yet.</p>
               ) : (
                 <div className="space-y-3">
                   {documents.map((doc) => (
-                    <div key={doc.id} className="p-4 border border-gray-200 rounded">
-                      <p className="font-semibold">{doc.filename}</p>
-                      <p className="text-sm text-gray-600">{doc.document_type}</p>
+                    <div key={doc.id} className="p-4 border border-gray-200 rounded flex items-center justify-between hover:bg-gray-50">
+                      <div className="flex items-center gap-3 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedDocs.includes(doc.id)}
+                          onChange={(e) => { e.stopPropagation(); toggleSelectDoc(doc.id); }}
+                        />
+                        <div
+                          className="cursor-pointer"
+                          onClick={async () => {
+                            try {
+                              const res = await axios.get(`/api/documents/${doc.id}`);
+                              setSelectedDocument({
+                                id: res.data.id,
+                                filename: res.data.filename,
+                                document_type: res.data.document_type,
+                                content_extracted: res.data.content_extracted || '',
+                                content_summary: res.data.content_summary || ''
+                              });
+                            } catch (err) {
+                              alert('Failed to load document: ' + (err.response?.data?.error || err.message));
+                            }
+                          }}
+                        >
+                          <p className="font-semibold">{doc.filename}</p>
+                          <p className="text-sm text-gray-600">{doc.document_type}</p>
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id); }}
+                          className="text-sm px-2 py-1 border rounded text-red-600"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -287,6 +303,81 @@ export default function CompanyDashboard() {
           </button>
         </div>
       </div>
+      {/* Document Detail Modal */}
+      {selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-screen overflow-y-auto p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">{selectedDocument.filename}</h2>
+              <button onClick={() => setSelectedDocument(null)} className="text-gray-600">Close</button>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 mb-2">Type: {selectedDocument.document_type}</p>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Extracted Content</label>
+              <textarea
+                className="w-full h-52 p-2 border rounded font-mono text-sm"
+                value={selectedDocument.content_extracted}
+                onChange={(e) => setSelectedDocument((d) => ({ ...d, content_extracted: e.target.value }))}
+              />
+            </div>
+
+            {/* Summary section */}
+            {selectedDocument.content_summary && (
+              <div className="mt-4 bg-blue-50 border border-blue-200 rounded p-4">
+                <h3 className="text-sm font-bold text-blue-800 mb-2">AI Document Summary</h3>
+                <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">{selectedDocument.content_summary}</pre>
+              </div>
+            )}
+
+            {summarizing && (
+              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded p-4 text-sm text-yellow-800">
+                Generating summary... this may take a few seconds.
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end gap-3">
+              <button onClick={() => { setSelectedDocument(null); setSummarizing(false); }} className="px-4 py-2 border rounded">Close</button>
+              <button
+                onClick={async () => {
+                  try {
+                    const payload = { content: selectedDocument.content_extracted, analyze: false };
+                    const res = await axios.put(`/api/documents/${selectedDocument.id}/update-content`, payload);
+                    setDocuments((prev) => prev.map(d => d.id === res.data.id ? res.data : d));
+                    setSelectedDocument(null);
+                    alert('Saved extracted content.');
+                  } catch (err) {
+                    alert('Save failed: ' + (err.response?.data?.error || err.message));
+                  }
+                }}
+                className="px-4 py-2 bg-brand-orange text-white rounded"
+              >
+                Save
+              </button>
+              <button
+                disabled={summarizing}
+                onClick={async () => {
+                  setSummarizing(true);
+                  try {
+                    const payload = { content: selectedDocument.content_extracted, analyze: true };
+                    const res = await axios.put(`/api/documents/${selectedDocument.id}/update-content`, payload);
+                    setDocuments((prev) => prev.map(d => d.id === res.data.id ? res.data : d));
+                    setSelectedDocument(null);
+                    // Open analysis page in new tab
+                    window.open(`/analysis/${selectedDocument.id}`, '_blank');
+                  } catch (err) {
+                    alert('Save & Analyze failed: ' + (err.response?.data?.error || err.message));
+                  } finally {
+                    setSummarizing(false);
+                  }
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50"
+              >
+                {summarizing ? 'Summarizing...' : 'Save & Analyze'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

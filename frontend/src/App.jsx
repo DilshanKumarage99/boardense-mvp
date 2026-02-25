@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage';
 import Dashboard from './pages/Dashboard';
 import CompanyDashboard from './pages/CompanyDashboard';
 import ReportPage from './pages/ReportPage';
+import AnalysisPage from './pages/AnalysisPage';
 import './index.css';
 
 function App() {
@@ -37,6 +38,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analysis/:documentId"
+            element={
+              <ProtectedRoute>
+                <AnalysisPage />
               </ProtectedRoute>
             }
           />

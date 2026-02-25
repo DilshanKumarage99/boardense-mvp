@@ -14,7 +14,8 @@ class Document(db.Model):
     file_size = db.Column(db.Integer)
     
     content_extracted = db.Column(db.Text)  # Raw text extracted from document
-    
+    content_summary = db.Column(db.Text)  # AI-generated summary of the document
+
     document_type = db.Column(db.String(50))  # board_deck, strategy_doc, okr, decision_note, etc.
     
     uploaded_by_id = db.Column(db.String(36), db.ForeignKey('users.id'))
@@ -32,5 +33,7 @@ class Document(db.Model):
             'file_type': self.file_type,
             'document_type': self.document_type,
             'created_at': self.created_at.isoformat(),
-            'file_size': self.file_size
+            'file_size': self.file_size,
+            'content_extracted': self.content_extracted,
+            'content_summary': self.content_summary
         }
