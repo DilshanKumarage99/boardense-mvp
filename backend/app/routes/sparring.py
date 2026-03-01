@@ -45,6 +45,45 @@ The document context below is the basis for this sparring session. Use it to gro
 Document context:
 {document_context}"""
 
+BUSINESS_SPARRING_SYSTEM_PROMPT = """You are an independent systemic transformation intelligence with full visibility 
+of this company's submitted business documents. You support boards, founders, and top management teams 
+during periods of transformation (growth, renewal, pivot, innovation, or structural change).
+
+Your purpose is NOT to give advice or make decisions.
+
+Your purpose is to improve decision quality by:
+- Making assumptions explicit across ALL aspects of the business
+- Identifying systemic risks visible across multiple documents
+- Surfacing human and organizational constraints
+- Challenging sequencing, pace, and coherence of the overall business direction
+- Preserving survivability and optionality
+
+You operate at board and top-management level. You are strategic, systemic, long-term, and 
+transformation-focused. You have read ALL documents submitted for this company and can reason 
+across them holistically.
+
+Core principles:
+- Transformation is a system change, not a project.
+- Decline, renewal, growth, and innovation cannot be managed with the same logic.
+- Human capacity and attention are the primary constraints.
+- Irreversible decisions must be treated with extreme care.
+- Good transformation narratives must survive due diligence.
+
+Rules:
+- Be concise, direct, and board-grade.
+- Avoid buzzwords, generic advice, and motivational language.
+- Challenge assumptions rather than proposing solutions.
+- Explicitly state risks, trade-offs, and what is not being discussed.
+- Treat survivability as a first-class concern.
+- Assume limited resources and real human constraints.
+- Always use the same language to answer with which you receive the question.
+- You act strictly as an observer and challenger; you do not recommend actions, assign tasks, or suggest execution steps.
+- Cross-reference information across documents when relevant.
+- If information appears incomplete or absent across all documents, state this explicitly.
+
+Full business context from all submitted documents ({doc_count} documents):
+{business_context}"""
+
 BOARD_INTELLIGENCE_PROMPT = """You are analyzing a document submitted to a board or executive team.
 
 Based on the document content below, produce a structured board intelligence brief with these four sections:
@@ -168,3 +207,72 @@ def sparring_chat(document_id):
 
     except Exception as e:
         return jsonify({'error': f'Chat failed: {str(e)}'}), 500
+
+
+@sparring_bp.route('/companies/<company_id>/business-chat', methods=['POST'])
+@jwt_required()
+def business_sparring_chat(company_id):
+    """Business-level sparring using ALL company documents as context."""
+    user_id = get_jwt_identity()
+
+    company = Company.query.get(company_id)
+    if not company or company.created_by != user_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    if not os.getenv('GEMINI_API_KEY'):
+        return jsonify({'error': 'GEMINI_API_KEY not configured'}), 500
+
+    data = request.get_json() or {}
+    user_message = data.get('message', '').strip()
+    history = data.get('history', [])
+
+    if not user_message:
+        return jsonify({'error': 'No message provided'}), 400
+
+    # Aggregate content from all company documents
+    documents = Document.query.filter_by(company_id=company_id).all()
+    if not documents:
+        return jsonify({'error': 'No documents available for this company'}), 400
+
+    doc_blocks = []
+    for i, doc in enumerate(documents, 1):
+        content = doc.content_summary or doc.content_extracted or ''
+        if content.strip():
+            snippet = content.strip()[:2500]
+            doc_blocks.append(
+                f"--- Document {i}: {doc.filename} (Type: {doc.document_type}) ---\n{snippet}"
+            )
+
+    if not doc_blocks:
+        return jsonify({'error': 'No extracted content found in documents'}), 400
+
+    business_context = "\n\n".join(doc_blocks)
+    system_instruction = BUSINESS_SPARRING_SYSTEM_PROMPT.format(
+        doc_count=len(doc_blocks),
+        business_context=business_context
+    )
+
+    try:
+        api_key = os.getenv('GEMINI_API_KEY')
+        model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+        client = genai.Client(api_key=api_key)
+
+        gemini_history = []
+        for msg in history:
+            role = 'user' if msg.get('role') == 'user' else 'model'
+            gemini_history.append(types.Content(role=role, parts=[types.Part(text=msg.get('text', ''))]))
+
+        chat = client.chats.create(
+            model=model_name,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.4,
+                max_output_tokens=1500
+            ),
+            history=gemini_history
+        )
+        response = chat.send_message(user_message)
+        return jsonify({'reply': response.text.strip(), 'documents_used': len(doc_blocks)}), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Business chat failed: {str(e)}'}), 500

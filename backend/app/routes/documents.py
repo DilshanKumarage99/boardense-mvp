@@ -5,6 +5,8 @@ from app.models.document import Document
 from app.models.company import Company, company_users
 from app.services.document_processor import process_document, extract_text_from_document
 from app.services.summarization_service import summarize_document
+from app.services.business_status_service import get_or_generate_business_status
+from app.services.exit_readiness_service import get_or_generate_exit_readiness
 import os
 from werkzeug.utils import secure_filename
 import tempfile
@@ -147,6 +149,17 @@ def upload_documents_batch(company_id):
             process_document(doc)
         except Exception as e:
             print(f"Error processing document {doc.id}: {e}")
+
+    # Auto-regenerate business status overview since new documents were added
+    try:
+        # Force invalidate stored count so it regenerates
+        company.business_status_doc_count = -1
+        company.exit_readiness_doc_count = -1
+        db.session.commit()
+        get_or_generate_business_status(company)
+        get_or_generate_exit_readiness(company)
+    except Exception as e:
+        print(f"Business status auto-update failed: {e}")
 
     return jsonify([d.to_dict() for d in saved_documents]), 201
 

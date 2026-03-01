@@ -10,6 +10,16 @@ class Company(db.Model):
     description = db.Column(db.Text)
     stage = db.Column(db.String(50))  # seed, series-a, series-b, etc.
     industry = db.Column(db.String(100))
+
+    # Stored Business Status Overview
+    business_status = db.Column(db.Text, nullable=True)            # JSON string
+    business_status_updated_at = db.Column(db.DateTime, nullable=True)
+    business_status_doc_count = db.Column(db.Integer, default=0)   # doc count at last generation
+
+    # Stored Exit Readiness Report
+    exit_readiness = db.Column(db.Text, nullable=True)             # JSON string
+    exit_readiness_updated_at = db.Column(db.DateTime, nullable=True)
+    exit_readiness_doc_count = db.Column(db.Integer, default=0)
     
     # Multi-tenancy
     created_by = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
