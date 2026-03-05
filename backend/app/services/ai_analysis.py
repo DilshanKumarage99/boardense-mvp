@@ -1,27 +1,22 @@
 import os
 import json
-try:
-    from openai import OpenAI
-    _OPENAI_NEW = True
-except Exception:
-    import openai
-    _OPENAI_NEW = False
+from google import genai
 from app.models.decision import Decision
 from app.models.risk import Risk
 
-# Initialize OpenAI client (you'll need to set OPENAI_API_KEY environment variable)
-if _OPENAI_NEW:
-    client = OpenAI(api_key=os.getenv('OPENAI_API_KEY', ''))
-else:
-    openai.api_key = os.getenv('OPENAI_API_KEY', '')
-    client = openai
+
+def _get_gemini_client():
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        return None
+    return genai.Client(api_key=api_key)
+
 
 def analyze_document_with_ai(document):
     """
-    Analyze document using OpenAI to extract decisions, risks, and strategic insights
-    This uses RAG principles - retrieve content, augment with context, generate analysis
+    Analyze document using Gemini to extract decisions, risks, and strategic insights.
     """
-    
+
     if not document.content_extracted:
         return {
             'decisions': [],
@@ -30,12 +25,11 @@ def analyze_document_with_ai(document):
             'questions': [],
             'summary': 'No content extracted from document'
         }
-    
-    # Prepare the analysis prompt
+
     analysis_prompt = f"""Analyze this strategic document for a startup/scaleup board. Extract:
 
 DOCUMENT CONTENT:
-{document.content_extracted[:4000]}  # Limit to first 4000 chars for token management
+{document.content_extracted[:4000]}
 
 Please provide JSON response with:
 1. "decisions": List of {{title, description, strategic_intent, assumptions}}
@@ -47,42 +41,24 @@ Please provide JSON response with:
 Return ONLY valid JSON, no markdown or extra text."""
 
     try:
-        # For MVP, we'll use a fallback analysis if API key not available
-        if not os.getenv('OPENAI_API_KEY'):
+        client = _get_gemini_client()
+        if not client:
             return fallback_analysis(document)
-        
-        # Support both the new `OpenAI` client and the older `openai` module
-        if _OPENAI_NEW:
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are an expert strategic advisor analyzing board documents. Always respond with valid JSON."},
-                    {"role": "user", "content": analysis_prompt}
-                ],
-                temperature=0.7,
-                max_tokens=2000
-            )
-            # new client: response.choices[0].message.content
-            try:
-                response_text = getattr(response.choices[0].message, 'content')
-            except Exception:
-                response_text = response.choices[0].message["content"]
-        else:
-            response = client.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are an expert strategic advisor analyzing board documents. Always respond with valid JSON."},
-                    {"role": "user", "content": analysis_prompt}
-                ],
-                temperature=0.7,
-                max_tokens=2000
-            )
-            # old client: dict-like response
-            response_text = response['choices'][0]['message']['content']
 
+        model = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+        response = client.models.generate_content(
+            model=model,
+            contents=analysis_prompt,
+        )
+        response_text = response.text.strip()
+        # Strip markdown code fences if present
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
         analysis = json.loads(response_text)
         return analysis
-        
+
     except Exception as e:
         print(f"AI analysis error: {e}")
         return fallback_analysis(document)
