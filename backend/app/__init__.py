@@ -16,7 +16,13 @@ def create_app():
     app = Flask(__name__)
     
     # Configuration
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///boardense.db')
+    db_url = os.getenv('DATABASE_URL', 'sqlite:///boardense.db')
+    # SQLAlchemy 2.0 requires postgresql+psycopg2:// dialect
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+    elif db_url.startswith('postgresql://'):
+        db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
     # Access token expiry (seconds or timedelta). Default to 1 hour for development.
     # You can override with env var JWT_ACCESS_TOKEN_EXPIRES (in seconds).
