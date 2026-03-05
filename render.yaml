@@ -18,5 +18,7 @@ services:
         sync: false   # Set this manually in Render dashboard
       - key: JWT_ACCESS_TOKEN_EXPIRES
         value: "28800"
+      - key: CORS_ORIGINS
+        value: "https://boardense-mvp.vercel.app"
       - key: DATABASE_URL
         value: sqlite:///boardense.db
