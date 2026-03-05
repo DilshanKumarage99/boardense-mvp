@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: boardense-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn run:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false   # Set this manually in Render dashboard
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: JWT_SECRET_KEY
+        sync: false   # Set this manually in Render dashboard
+      - key: JWT_ACCESS_TOKEN_EXPIRES
+        value: "28800"
+      - key: DATABASE_URL
+        value: sqlite:///boardense.db

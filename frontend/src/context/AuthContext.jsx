@@ -1,6 +1,11 @@
 import React, { createContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
+// In production (Vercel), set REACT_APP_API_URL to your Render backend URL
+if (process.env.REACT_APP_API_URL) {
+  axios.defaults.baseURL = process.env.REACT_APP_API_URL;
+}
+
 export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {

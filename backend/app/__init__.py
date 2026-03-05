@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 from datetime import timedelta
@@ -28,6 +29,7 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     jwt.init_app(app)
+    CORS(app, resources={r'/api/*': {'origins': os.getenv('CORS_ORIGINS', '*')}}, supports_credentials=True)
     
     # Register blueprints
     from app.routes.auth import auth_bp
