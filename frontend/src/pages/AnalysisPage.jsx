@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { AuthContext } from '../context/AuthContext';
 import { FaArrowLeft, FaBrain, FaComments, FaSpinner, FaChevronDown, FaChevronUp, FaPaperPlane } from 'react-icons/fa';
 
 export default function AnalysisPage() {
   const { documentId } = useParams();
-  const { user } = useContext(AuthContext);
-  const navigate = useNavigate();
+
 
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
