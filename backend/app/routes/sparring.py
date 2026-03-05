@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models.document import Document
 from app.models.company import Company
+from app.services.embedding_service import get_relevant_docs
 import os
 from google import genai
 from google.genai import types
@@ -229,16 +230,22 @@ def business_sparring_chat(company_id):
     if not user_message:
         return jsonify({'error': 'No message provided'}), 400
 
-    # Aggregate content from all company documents
-    documents = Document.query.filter_by(company_id=company_id).all()
-    if not documents:
+    # Try semantic search first — fall back to all docs if embeddings unavailable
+    all_documents = Document.query.filter_by(company_id=company_id).all()
+    if not all_documents:
         return jsonify({'error': 'No documents available for this company'}), 400
 
+    relevant_docs = get_relevant_docs(user_message, company_id, top_k=5)
+    using_embeddings = relevant_docs is not None
+    selected_docs = relevant_docs if using_embeddings else all_documents
+
     doc_blocks = []
-    for i, doc in enumerate(documents, 1):
+    for i, doc in enumerate(selected_docs, 1):
         content = doc.content_summary or doc.content_extracted or ''
         if content.strip():
-            snippet = content.strip()[:2500]
+            # Allow larger snippet when only top-5 docs are used
+            max_chars = 6000 if using_embeddings else 2500
+            snippet = content.strip()[:max_chars]
             doc_blocks.append(
                 f"--- Document {i}: {doc.filename} (Type: {doc.document_type}) ---\n{snippet}"
             )
@@ -247,8 +254,10 @@ def business_sparring_chat(company_id):
         return jsonify({'error': 'No extracted content found in documents'}), 400
 
     business_context = "\n\n".join(doc_blocks)
+    total_docs = len(all_documents)
+    context_note = f"{len(doc_blocks)} most relevant of {total_docs}" if using_embeddings else str(len(doc_blocks))
     system_instruction = BUSINESS_SPARRING_SYSTEM_PROMPT.format(
-        doc_count=len(doc_blocks),
+        doc_count=context_note,
         business_context=business_context
     )
 
@@ -272,7 +281,12 @@ def business_sparring_chat(company_id):
             history=gemini_history
         )
         response = chat.send_message(user_message)
-        return jsonify({'reply': response.text.strip(), 'documents_used': len(doc_blocks)}), 200
+        return jsonify({
+            'reply': response.text.strip(),
+            'documents_used': len(doc_blocks),
+            'total_documents': len(all_documents),
+            'semantic_search': using_embeddings
+        }), 200
 
     except Exception as e:
         return jsonify({'error': f'Business chat failed: {str(e)}'}), 500

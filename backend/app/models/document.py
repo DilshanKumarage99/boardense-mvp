@@ -15,6 +15,7 @@ class Document(db.Model):
     
     content_extracted = db.Column(db.Text)  # Raw text extracted from document
     content_summary = db.Column(db.Text)  # AI-generated summary of the document
+    embedding = db.Column(db.Text, nullable=True)  # JSON array — Gemini text-embedding-004 vector
 
     document_type = db.Column(db.String(50))  # board_deck, strategy_doc, okr, decision_note, etc.
     

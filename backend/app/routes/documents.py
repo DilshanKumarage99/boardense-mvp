@@ -7,6 +7,7 @@ from app.services.document_processor import process_document, extract_text_from_
 from app.services.summarization_service import summarize_document
 from app.services.business_status_service import get_or_generate_business_status
 from app.services.exit_readiness_service import get_or_generate_exit_readiness
+from app.services.embedding_service import embed_document
 import os
 from werkzeug.utils import secure_filename
 import tempfile
@@ -62,7 +63,13 @@ def upload_document(company_id):
         process_document(document)
     except Exception as e:
         print(f"Error processing document: {e}")
-    
+
+    # Generate embedding for semantic search
+    try:
+        embed_document(document)
+    except Exception as e:
+        print(f"Error embedding document: {e}")
+
     return jsonify(document.to_dict()), 201
 
 @documents_bp.route('/companies/<company_id>/list', methods=['GET'])
@@ -149,6 +156,13 @@ def upload_documents_batch(company_id):
             process_document(doc)
         except Exception as e:
             print(f"Error processing document {doc.id}: {e}")
+
+    # Generate embeddings for semantic search (after processing so summaries exist)
+    for doc in saved_documents:
+        try:
+            embed_document(doc)
+        except Exception as e:
+            print(f"Error embedding document {doc.id}: {e}")
 
     # Auto-regenerate business status overview since new documents were added
     try:
@@ -407,6 +421,20 @@ def delete_document(document_id):
         return jsonify({'success': True}), 200
     except Exception as e:
         return jsonify({'error': f'Failed to delete document: {str(e)}'}), 500
+
+
+@documents_bp.route('/companies/<company_id>/embed-all', methods=['POST'])
+@jwt_required()
+def backfill_embeddings(company_id):
+    """Generate embeddings for all documents that don't have one yet."""
+    user_id = get_jwt_identity()
+    company = Company.query.get(company_id)
+    if not company or company.created_by != user_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    from app.services.embedding_service import embed_all_company_docs
+    result = embed_all_company_docs(company_id)
+    return jsonify(result), 200
 
 
 @documents_bp.route('/delete-batch', methods=['POST'])
