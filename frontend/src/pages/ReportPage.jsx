@@ -83,10 +83,6 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
-
   const fetchReport = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -102,6 +98,10 @@ export default function ReportPage() {
       setLoading(false);
     }
   }, [companyId, token]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
 
   if (loading) return <div className="text-center p-16 text-gray-500">Generating report...</div>;
   if (error) return <div className="text-center p-16 text-red-600">{error}</div>;
