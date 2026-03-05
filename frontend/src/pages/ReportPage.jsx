@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
@@ -85,9 +85,9 @@ export default function ReportPage() {
 
   useEffect(() => {
     fetchReport();
-  }, [companyId]);
+  }, [fetchReport]);
 
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -101,7 +101,7 @@ export default function ReportPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, token]);
 
   if (loading) return <div className="text-center p-16 text-gray-500">Generating report...</div>;
   if (error) return <div className="text-center p-16 text-red-600">{error}</div>;
