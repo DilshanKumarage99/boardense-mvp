@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { FaArrowLeft, FaBrain, FaComments, FaSpinner, FaChevronDown, FaChevronUp, FaPaperPlane } from 'react-icons/fa';
@@ -26,17 +26,7 @@ export default function AnalysisPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef(null);
 
-  useEffect(() => {
-    fetchDocument();
-  }, [documentId]);
-
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatHistory]);
-
-  const fetchDocument = async () => {
+  const fetchDocument = useCallback(async () => {
     try {
       const res = await axios.get(`/api/documents/${documentId}`);
       setDocument(res.data);
@@ -45,7 +35,17 @@ export default function AnalysisPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [documentId]);
+
+  useEffect(() => {
+    fetchDocument();
+  }, [fetchDocument]);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory]);
 
   const loadBoardIntelligence = async () => {
     if (intelligence) { setShowIntelligence(true); return; }

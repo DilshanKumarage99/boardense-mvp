@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
+import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
@@ -6,7 +6,7 @@ import { FaUpload, FaFileAlt, FaClipboardCheck, FaArrowLeft, FaBuilding, FaSync,
 
 export default function CompanyDashboard() {
   const { companyId } = useParams();
-  const { user, token } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [company, setCompany] = useState(null);
@@ -16,7 +16,6 @@ export default function CompanyDashboard() {
   const [documentType, setDocumentType] = useState('board_deck');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [summary, setSummary] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null); // {id, filename, content_extracted, content_summary}
   const [summarizing, setSummarizing] = useState(false);
   const [businessStatus, setBusinessStatus] = useState(null);
@@ -29,13 +28,7 @@ export default function CompanyDashboard() {
   const [showBizChat, setShowBizChat] = useState(false);
   const bizChatEndRef = useRef(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchCompanyData();
-    }
-  }, [user]);
-
-  const fetchCompanyData = async () => {
+  const fetchCompanyData = useCallback(async () => {
     try {
       const response = await axios.get(`/api/companies/${companyId}`);
       setCompany(response.data);
@@ -59,7 +52,13 @@ export default function CompanyDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      fetchCompanyData();
+    }
+  }, [user, fetchCompanyData]);
 
   const handleDeleteDocument = async (docId) => {
     if (!window.confirm('Delete this extracted document?')) return;
