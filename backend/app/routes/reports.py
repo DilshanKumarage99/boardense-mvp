@@ -8,6 +8,7 @@ from app.models.analysis import Analysis
 from app.services.report_generator import generate_exit_readiness_report, generate_investor_questions_report
 from app.services.business_status_service import get_or_generate_business_status
 from app.services.exit_readiness_service import get_or_generate_exit_readiness
+from app.services.renewal_os_service import get_or_generate_renewal_os
 
 reports_bp = Blueprint('reports', __name__, url_prefix='/api/reports')
 
@@ -63,5 +64,25 @@ def get_business_status(company_id):
     try:
         status = get_or_generate_business_status(company)
         return jsonify(status), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@reports_bp.route('/companies/<company_id>/renewal-os', methods=['GET'])
+@jwt_required()
+def get_renewal_os(company_id):
+    user_id = get_jwt_identity()
+
+    company = Company.query.get(company_id)
+    if not company or company.created_by != user_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    report_type = request.args.get('report_type', 'executive')
+    if report_type not in ('executive', 'board'):
+        return jsonify({'error': 'report_type must be "executive" or "board"'}), 400
+
+    try:
+        report = get_or_generate_renewal_os(company, report_type=report_type)
+        return jsonify(report), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

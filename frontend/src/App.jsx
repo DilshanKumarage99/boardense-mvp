@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import CompanyDashboard from './pages/CompanyDashboard';
 import ReportPage from './pages/ReportPage';
 import AnalysisPage from './pages/AnalysisPage';
+import RenewalOSPage from './pages/RenewalOSPage';
 import './index.css';
 
 function App() {
@@ -46,6 +47,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <AnalysisPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/company/:companyId/renewal-os"
+            element={
+              <ProtectedRoute>
+                <RenewalOSPage />
               </ProtectedRoute>
             }
           />

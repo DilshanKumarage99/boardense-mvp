@@ -663,16 +663,26 @@ export default function CompanyDashboard() {
         </div>
 
         {/* Reports Section */}
-        <div className="mt-8">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
           <button
             onClick={() => navigate(`/reports/${companyId}/exit-readiness`)}
-            className="w-full bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 border-l-4 border-brand-orange text-center"
+            className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 border-l-4 border-brand-orange text-center"
           >
             <div className="flex items-center justify-center gap-2 mb-2">
               <FaClipboardCheck className="text-brand-orange" />
               <h3 className="text-xl font-bold">Exit Readiness Report</h3>
             </div>
             <p className="text-gray-600">Assess governance maturity and due diligence readiness</p>
+          </button>
+          <button
+            onClick={() => navigate(`/company/${companyId}/renewal-os`)}
+            className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 border-l-4 border-purple-500 text-center"
+          >
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <FaSync className="text-purple-500" />
+              <h3 className="text-xl font-bold">Renewal OS Report</h3>
+            </div>
+            <p className="text-gray-600">Assess organizational renewal capability across 4 dimensions</p>
           </button>
         </div>
       </div>
