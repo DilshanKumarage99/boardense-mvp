@@ -20,5 +20,3 @@ services:
         value: "28800"
       - key: CORS_ORIGINS
         value: "https://boardense-mvp.vercel.app"
-      - key: DATABASE_URL
-        value: sqlite:///boardense.db

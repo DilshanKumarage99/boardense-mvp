@@ -1,10 +1,8 @@
 import os
 import json
-from datetime import datetime
 from google import genai
 from google.genai import types
 from app.models.document import Document
-from app import db
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STEP 1 — ROS Core Analysis Prompt
@@ -162,62 +160,15 @@ SYSTEM_INSTRUCTION = (
 
 def get_or_generate_renewal_os(company, report_type='executive'):
     """
-    Return the cached Renewal OS report for the given report_type if the document
-    count hasn't changed, otherwise regenerate and cache it.
+    Generate Renewal OS report for the given report_type.
+    Stateless by design to avoid schema-coupled cache columns in Company.
 
     report_type: 'executive' | 'board'
     """
-    current_doc_count = Document.query.filter_by(company_id=company.id).count()
-    report_key = 'executive_report' if report_type == 'executive' else 'board_brief'
-
-    # Try to serve from cache
-    if (
-        company.renewal_os_analysis
-        and company.renewal_os_doc_count == current_doc_count
-        and current_doc_count > 0
-    ):
-        try:
-            cached = json.loads(company.renewal_os_analysis)
-            if report_key in cached and cached[report_key]:
-                result = cached[report_key].copy()
-                core = cached.get('core', {})
-                result['_cached'] = True
-                result['_last_updated'] = (
-                    company.renewal_os_updated_at.isoformat()
-                    if company.renewal_os_updated_at else None
-                )
-                result['_core_scores'] = core.get('scores')
-                result['_maturity_level'] = core.get('maturity_level')
-                result['_documents_analysed'] = core.get('documents_analysed', 0)
-                result['_confidence_score'] = core.get('confidence_score', 0)
-                return result
-        except Exception:
-            pass
-
-    # Generate fresh report
     result = _generate_renewal_os(company, report_type)
-
-    # Cache if successful
-    if 'error' not in result:
-        try:
-            existing = json.loads(company.renewal_os_analysis) if company.renewal_os_analysis else {}
-        except Exception:
-            existing = {}
-
-        existing['core'] = result.pop('_core', {})
-        existing[report_key] = {k: v for k, v in result.items() if not k.startswith('_')}
-
-        company.renewal_os_analysis = json.dumps(existing)
-        company.renewal_os_updated_at = datetime.utcnow()
-        company.renewal_os_doc_count = current_doc_count
-        db.session.commit()
-
     result.pop('_core', None)
     result['_cached'] = False
-    result['_last_updated'] = (
-        company.renewal_os_updated_at.isoformat()
-        if company.renewal_os_updated_at else None
-    )
+    result['_last_updated'] = None
     return result
 
 

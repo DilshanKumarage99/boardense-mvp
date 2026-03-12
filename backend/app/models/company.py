@@ -21,11 +21,6 @@ class Company(db.Model):
     exit_readiness_updated_at = db.Column(db.DateTime, nullable=True)
     exit_readiness_doc_count = db.Column(db.Integer, default=0)
 
-    # Stored Renewal OS Report
-    renewal_os_analysis = db.Column(db.Text, nullable=True)        # JSON string
-    renewal_os_updated_at = db.Column(db.DateTime, nullable=True)
-    renewal_os_doc_count = db.Column(db.Integer, default=0)
-
     # Multi-tenancy
     created_by = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
