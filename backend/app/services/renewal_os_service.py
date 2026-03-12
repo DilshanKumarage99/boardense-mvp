@@ -1,8 +1,12 @@
 import os
 import json
+from datetime import datetime
 from google import genai
 from google.genai import types
 from app.models.document import Document
+
+
+_RENEWAL_CACHE = {}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STEP 1 — ROS Core Analysis Prompt
@@ -161,14 +165,33 @@ SYSTEM_INSTRUCTION = (
 def get_or_generate_renewal_os(company, report_type='executive'):
     """
     Generate Renewal OS report for the given report_type.
-    Stateless by design to avoid schema-coupled cache columns in Company.
+    Returns cached results when documents haven't changed.
 
     report_type: 'executive' | 'board'
     """
+    current_doc_count = Document.query.filter_by(company_id=company.id).count()
+    cache_key = (company.id, report_type)
+
+    cached_entry = _RENEWAL_CACHE.get(cache_key)
+    if cached_entry and cached_entry.get('doc_count') == current_doc_count:
+        cached_result = dict(cached_entry.get('result', {}))
+        cached_result['_cached'] = True
+        cached_result['_last_updated'] = cached_entry.get('updated_at')
+        return cached_result
+
     result = _generate_renewal_os(company, report_type)
     result.pop('_core', None)
     result['_cached'] = False
-    result['_last_updated'] = None
+    timestamp = datetime.utcnow().isoformat()
+    result['_last_updated'] = timestamp
+
+    if 'error' not in result:
+        _RENEWAL_CACHE[cache_key] = {
+            'doc_count': current_doc_count,
+            'updated_at': timestamp,
+            'result': dict(result),
+        }
+
     return result
 
 
@@ -197,7 +220,7 @@ def _generate_renewal_os(company, report_type):
 
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
-        return _fallback_report(company, report_type, documents)
+        return _fallback_report(company, report_type, documents, reason='GEMINI_API_KEY not configured')
 
     combined = "\n\n".join(doc_blocks)
 
@@ -256,10 +279,10 @@ def _generate_renewal_os(company, report_type):
 
     except json.JSONDecodeError as e:
         print(f'Renewal OS JSON parse error: {e}')
-        return _fallback_report(company, report_type, documents)
+        return _fallback_report(company, report_type, documents, reason='AI response parse error')
     except Exception as e:
         print(f'Renewal OS generation error: {e}')
-        return _fallback_report(company, report_type, documents)
+        return _fallback_report(company, report_type, documents, reason=f'AI service error: {str(e)}')
 
 
 def _strip_fences(text):
@@ -303,9 +326,9 @@ def _empty_report(company, report_type, reason="No data available."):
     return base
 
 
-def _fallback_report(company, report_type, documents):
+def _fallback_report(company, report_type, documents, reason='AI analysis unavailable'):
     msg = (
-        f'Renewal OS analysis unavailable — AI response could not be parsed. '
+        f'Renewal OS analysis unavailable — {reason}. '
         f'{len(documents)} document(s) submitted. Please try again.'
     )
     base = {

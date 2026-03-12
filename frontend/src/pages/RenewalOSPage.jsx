@@ -366,7 +366,7 @@ export default function RenewalOSPage() {
                 onClick={() => fetchReport(reportType)}
                 className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 underline"
               >
-                <FaSync className="text-xs" /> Regenerate
+                <FaSync className="text-xs" /> Refresh
               </button>
             </div>
 

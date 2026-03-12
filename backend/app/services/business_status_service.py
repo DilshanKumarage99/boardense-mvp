@@ -131,7 +131,7 @@ def generate_business_status(company):
 
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
-        return _fallback_status(company, documents)
+        return _fallback_status(company, documents, reason='GEMINI_API_KEY not configured')
 
     try:
         model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
@@ -164,10 +164,10 @@ def generate_business_status(company):
 
     except json.JSONDecodeError as e:
         print(f'Business status JSON parse error: {e}')
-        return _fallback_status(company, documents)
+        return _fallback_status(company, documents, reason='AI response parse error')
     except Exception as e:
         print(f'Business status generation error: {e}')
-        return _fallback_status(company, documents)
+        return _fallback_status(company, documents, reason=f'AI service error: {str(e)}')
 
 
 def _empty_status(company, reason="No data available."):
@@ -187,13 +187,13 @@ def _empty_status(company, reason="No data available."):
     }
 
 
-def _fallback_status(company, documents):
+def _fallback_status(company, documents, reason='AI analysis unavailable'):
     """Basic fallback when Gemini is unavailable."""
     return {
         'company_name': company.name,
         'company_stage': company.stage,
         'company_industry': company.industry,
-        'business_summary': f'Business status based on {len(documents)} submitted document(s). AI analysis unavailable — GEMINI_API_KEY not configured.',
+        'business_summary': f'Business status based on {len(documents)} submitted document(s). AI analysis unavailable — {reason}.',
         'financial_health': {
             'revenue_trend': 'unknown',
             'profitability_status': 'Not available — AI analysis required',
@@ -220,5 +220,5 @@ def _fallback_status(company, documents):
         },
         'confidence_score': 0,
         'documents_analysed': len(documents),
-        'error': 'GEMINI_API_KEY not configured'  # Prevents caching so it retries next time
+        'error': reason  # Prevents caching so it retries next time
     }
