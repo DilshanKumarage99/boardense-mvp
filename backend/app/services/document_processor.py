@@ -3,6 +3,11 @@ from pathlib import Path
 import PyPDF2
 from docx import Document as DocxDocument
 
+try:
+    from openpyxl import load_workbook
+except Exception:
+    load_workbook = None
+
 # Import Presentation from python-pptx optionally so the app can start
 # even if python-pptx isn't installed. If missing, handle it when
 # attempting to extract from .pptx files and provide a clear error.
@@ -10,6 +15,11 @@ try:
     from pptx import Presentation
 except Exception:
     Presentation = None
+
+try:
+    import xlrd
+except Exception:
+    xlrd = None
 
 def extract_text_from_document(file_path):
     """Extract text from various document formats"""
@@ -25,8 +35,86 @@ def extract_text_from_document(file_path):
     elif ext == '.txt':
         with open(file_path, 'r', encoding='utf-8') as f:
             return f.read()
+    elif ext in {'.xlsx', '.xls'}:
+        return extract_text_from_excel(file_path)
     else:
         raise ValueError(f"Unsupported file format: {ext}")
+
+
+def extract_text_from_excel(file_path):
+    """Extract text from Excel workbooks (.xlsx/.xls)."""
+    ext = Path(file_path).suffix.lower()
+
+    if ext == '.xlsx':
+        return extract_text_from_xlsx(file_path)
+    if ext == '.xls':
+        return extract_text_from_xls(file_path)
+
+    raise ValueError(f"Unsupported Excel format: {ext}")
+
+
+def extract_text_from_xlsx(file_path):
+    """Extract text from XLSX using openpyxl."""
+    if load_workbook is None:
+        raise ImportError("openpyxl is not installed. Install it with: pip install openpyxl")
+
+    output = []
+    try:
+        workbook_values = load_workbook(filename=file_path, data_only=True)
+        workbook_formulas = load_workbook(filename=file_path, data_only=False)
+
+        for sheet_values, sheet_formulas in zip(workbook_values.worksheets, workbook_formulas.worksheets):
+            sheet_lines = [f"\n--- SHEET: {sheet_values.title} ---"]
+
+            max_row = max(sheet_values.max_row, sheet_formulas.max_row)
+            max_col = max(sheet_values.max_column, sheet_formulas.max_column)
+
+            for row_index in range(1, max_row + 1):
+                row_values = []
+                for col_index in range(1, max_col + 1):
+                    value_cell = sheet_values.cell(row=row_index, column=col_index).value
+                    formula_cell = sheet_formulas.cell(row=row_index, column=col_index).value
+
+                    cell_value = value_cell if value_cell is not None else formula_cell
+                    if cell_value is None:
+                        continue
+
+                    cell_text = str(cell_value).strip()
+                    if cell_text:
+                        row_values.append(cell_text)
+
+                if row_values:
+                    sheet_lines.append(" | ".join(row_values))
+
+            if len(sheet_lines) > 1:
+                output.extend(sheet_lines)
+    except Exception as e:
+        raise ValueError(f"Error reading XLSX: {e}")
+
+    return "\n".join(output)
+
+
+def extract_text_from_xls(file_path):
+    """Extract text from XLS using xlrd."""
+    if xlrd is None:
+        raise ImportError("xlrd is not installed. Install it with: pip install xlrd")
+
+    output = []
+    try:
+        workbook = xlrd.open_workbook(file_path)
+        for sheet in workbook.sheets():
+            sheet_lines = [f"\n--- SHEET: {sheet.name} ---"]
+            for row_index in range(sheet.nrows):
+                row = sheet.row_values(row_index)
+                row_values = [str(cell).strip() for cell in row if str(cell).strip()]
+                if row_values:
+                    sheet_lines.append(" | ".join(row_values))
+            if len(sheet_lines) > 1:
+                output.extend(sheet_lines)
+    except Exception as e:
+        raise ValueError(f"Error reading XLS: {e}")
+
+    return "\n".join(output)
 
 def extract_text_from_pdf(file_path):
     """Extract text from PDF"""

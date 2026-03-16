@@ -13,7 +13,6 @@ export default function Dashboard() {
   const [creating, setCreating] = useState(false);
   const [newCompanyData, setNewCompanyData] = useState({
     name: '',
-    stage: 'seed',
     industry: ''
   });
 
@@ -39,7 +38,7 @@ export default function Dashboard() {
     try {
       const response = await axios.post('/api/companies/create', newCompanyData);
       setCompanies([...companies, response.data]);
-      setNewCompanyData({ name: '', stage: 'seed', industry: '' });
+      setNewCompanyData({ name: '', industry: '' });
       setShowNewCompanyForm(false);
       navigate(`/company/${response.data.id}`);
     } catch (err) {
@@ -91,28 +90,14 @@ export default function Dashboard() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2">Stage</label>
-                  <select
-                    value={newCompanyData.stage}
-                    onChange={(e) => setNewCompanyData({...newCompanyData, stage: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded"
-                  >
-                    <option value="seed">Seed</option>
-                    <option value="series-a">Series A</option>
-                    <option value="series-b">Series B</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2">Industry</label>
-                  <input
-                    type="text"
-                    value={newCompanyData.industry}
-                    onChange={(e) => setNewCompanyData({...newCompanyData, industry: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded"
-                  />
-                </div>
+              <div className="mb-4">
+                <label className="block text-gray-700 font-semibold mb-2">Industry</label>
+                <input
+                  type="text"
+                  value={newCompanyData.industry}
+                  onChange={(e) => setNewCompanyData({...newCompanyData, industry: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded"
+                />
               </div>
 
               <button
@@ -120,7 +105,7 @@ export default function Dashboard() {
                 disabled={creating}
                 className="bg-brand-orange text-white px-6 py-2 rounded hover:bg-brand-orange-dark disabled:opacity-50 flex items-center gap-2"
               >
-                <FaPlus /> {creating ? 'Creating...' : 'Create Company'}
+                {creating ? 'Saving...' : 'Save'}
               </button>
             </form>
           </div>

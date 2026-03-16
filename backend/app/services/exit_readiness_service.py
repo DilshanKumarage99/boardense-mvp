@@ -4,6 +4,7 @@ from datetime import datetime
 from google import genai
 from google.genai import types
 from app.models.document import Document
+from app.services.document_processor import process_document
 from app import db
 
 EXIT_READINESS_PROMPT = """You are a senior M&A advisor and due diligence expert reviewing all submitted business documents for a company considering an exit (sale, acquisition, or investor event).
@@ -100,6 +101,50 @@ SYSTEM_INSTRUCTION = (
 )
 
 
+def _strip_fences(text):
+  text = (text or '').strip()
+  if text.startswith('```'):
+    text = text.split('```')[1]
+    if text.startswith('json'):
+      text = text[4:]
+    text = text.strip()
+  return text
+
+
+def _extract_json_object(text):
+  start = text.find('{')
+  end = text.rfind('}')
+  if start == -1 or end == -1 or end <= start:
+    return text
+  return text[start:end + 1]
+
+
+def _parse_json_strict_then_loose(raw_text):
+  stripped = _strip_fences(raw_text)
+  try:
+    return json.loads(stripped)
+  except json.JSONDecodeError:
+    candidate = _extract_json_object(stripped)
+    return json.loads(candidate)
+
+
+def _repair_json_response(client, model_name, raw_text):
+  repair_prompt = (
+    "Convert the following content into valid JSON only. "
+    "Do not include markdown fences or extra commentary.\n\n"
+    f"CONTENT:\n{raw_text}"
+  )
+  repair = client.models.generate_content(
+    model=model_name,
+    contents=repair_prompt,
+    config=types.GenerateContentConfig(
+      temperature=0,
+      max_output_tokens=3500
+    )
+  )
+  return _parse_json_strict_then_loose(repair.text)
+
+
 def get_or_generate_exit_readiness(company):
     """
     Return stored exit readiness if doc count unchanged, otherwise regenerate and save.
@@ -142,6 +187,12 @@ def generate_exit_readiness(company):
     doc_blocks = []
     for i, doc in enumerate(documents, 1):
         content = doc.content_summary or doc.content_extracted or ''
+        if not content.strip():
+            try:
+                process_document(doc)
+                content = doc.content_summary or doc.content_extracted or ''
+            except Exception:
+                content = ''
         if content.strip():
             snippet = content.strip()[:2500]
             doc_blocks.append(
@@ -176,14 +227,11 @@ def generate_exit_readiness(company):
             )
         )
 
-        raw = response.text.strip()
-        if raw.startswith('```'):
-            raw = raw.split('```')[1]
-            if raw.startswith('json'):
-                raw = raw[4:]
-            raw = raw.strip()
-
-        result = json.loads(raw)
+        raw = response.text or ''
+        try:
+          result = _parse_json_strict_then_loose(raw)
+        except json.JSONDecodeError:
+          result = _repair_json_response(client, model_name, raw)
         result['documents_analysed'] = len(doc_blocks)
         result['company_name'] = company.name
         result['company_stage'] = company.stage

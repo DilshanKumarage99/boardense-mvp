@@ -16,7 +16,7 @@ documents_bp = Blueprint('documents', __name__, url_prefix='/api/documents')
 
 # On Azure App Service, /home is persistent storage. Use UPLOAD_FOLDER env var to override.
 UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')
-ALLOWED_EXTENSIONS = {'pdf', 'docx', 'pptx', 'txt'}
+ALLOWED_EXTENSIONS = {'pdf', 'docx', 'pptx', 'txt', 'xlsx', 'xls'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS

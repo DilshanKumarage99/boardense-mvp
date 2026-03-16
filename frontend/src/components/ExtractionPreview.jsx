@@ -137,11 +137,11 @@ export default function ExtractionPreview({
                 <input
                   type="file"
                   onChange={handleFileSelect}
-                  accept=".pdf,.docx,.pptx,.txt"
+                  accept=".pdf,.docx,.pptx,.txt,.xlsx,.xls"
                   className="w-full px-3 py-2 border border-gray-300 rounded"
                   disabled={extracting}
                 />
-                <p className="text-xs text-gray-500 mt-1">Supported: PDF, DOCX, PPTX, TXT</p>
+                <p className="text-xs text-gray-500 mt-1">Supported: PDF, DOCX, PPTX, TXT, XLSX, XLS</p>
               </div>
               <button
                 onClick={handleExtract}

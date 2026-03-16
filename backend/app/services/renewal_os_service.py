@@ -4,6 +4,7 @@ from datetime import datetime
 from google import genai
 from google.genai import types
 from app.models.document import Document
+from app.services.document_processor import process_document
 
 
 _RENEWAL_CACHE = {}
@@ -209,6 +210,12 @@ def _generate_renewal_os(company, report_type):
     doc_blocks = []
     for i, doc in enumerate(documents, 1):
         content = doc.content_summary or doc.content_extracted or ''
+        if not content.strip():
+            try:
+                process_document(doc)
+                content = doc.content_summary or doc.content_extracted or ''
+            except Exception:
+                content = ''
         if content.strip():
             snippet = content.strip()[:2500]
             doc_blocks.append(
@@ -244,8 +251,11 @@ def _generate_renewal_os(company, report_type):
                 max_output_tokens=8192
             )
         )
-        raw_core = _strip_fences(core_response.text)
-        core_analysis = json.loads(raw_core)
+        raw_core = core_response.text or ''
+        try:
+            core_analysis = _parse_json_strict_then_loose(raw_core)
+        except json.JSONDecodeError:
+            core_analysis = _repair_json_response(client, model_name, raw_core, max_output_tokens=8192)
         core_analysis['documents_analysed'] = len(doc_blocks)
 
         # ── Step 2: Report Formatter ──────────────────────────────────────
@@ -265,8 +275,11 @@ def _generate_renewal_os(company, report_type):
                 max_output_tokens=8192
             )
         )
-        raw_report = _strip_fences(report_response.text)
-        report = json.loads(raw_report)
+        raw_report = report_response.text or ''
+        try:
+            report = _parse_json_strict_then_loose(raw_report)
+        except json.JSONDecodeError:
+            report = _repair_json_response(client, model_name, raw_report, max_output_tokens=8192)
 
         # Attach metadata for caching
         report['_core'] = core_analysis
@@ -287,13 +300,47 @@ def _generate_renewal_os(company, report_type):
 
 def _strip_fences(text):
     """Remove markdown code fences from a Gemini response."""
-    text = text.strip()
+    text = (text or '').strip()
     if text.startswith('```'):
         text = text.split('```')[1]
         if text.startswith('json'):
             text = text[4:]
         text = text.strip()
     return text
+
+
+def _extract_json_object(text):
+    start = text.find('{')
+    end = text.rfind('}')
+    if start == -1 or end == -1 or end <= start:
+        return text
+    return text[start:end + 1]
+
+
+def _parse_json_strict_then_loose(raw_text):
+    stripped = _strip_fences(raw_text)
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        candidate = _extract_json_object(stripped)
+        return json.loads(candidate)
+
+
+def _repair_json_response(client, model_name, raw_text, max_output_tokens=8192):
+    repair_prompt = (
+        "Convert the following content into valid JSON only. "
+        "Do not include markdown fences or extra commentary.\n\n"
+        f"CONTENT:\n{raw_text}"
+    )
+    repair = client.models.generate_content(
+        model=model_name,
+        contents=repair_prompt,
+        config=types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=max_output_tokens
+        )
+    )
+    return _parse_json_strict_then_loose(repair.text)
 
 
 def _empty_report(company, report_type, reason="No data available."):

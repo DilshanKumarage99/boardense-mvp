@@ -4,6 +4,7 @@ from datetime import datetime
 from google import genai
 from google.genai import types
 from app.models.document import Document
+from app.services.document_processor import process_document
 from app import db
 
 BUSINESS_STATUS_PROMPT = """You are a senior business analyst reviewing multiple business documents submitted by a company's board or management team.
@@ -64,6 +65,50 @@ SYSTEM_INSTRUCTION = (
 )
 
 
+def _strip_fences(text):
+    text = (text or '').strip()
+    if text.startswith('```'):
+        text = text.split('```')[1]
+        if text.startswith('json'):
+            text = text[4:]
+        text = text.strip()
+    return text
+
+
+def _extract_json_object(text):
+    start = text.find('{')
+    end = text.rfind('}')
+    if start == -1 or end == -1 or end <= start:
+        return text
+    return text[start:end + 1]
+
+
+def _parse_json_strict_then_loose(raw_text):
+    stripped = _strip_fences(raw_text)
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        candidate = _extract_json_object(stripped)
+        return json.loads(candidate)
+
+
+def _repair_json_response(client, model_name, raw_text):
+    repair_prompt = (
+        "Convert the following content into valid JSON only. "
+        "Do not include markdown fences or extra commentary.\n\n"
+        f"CONTENT:\n{raw_text}"
+    )
+    repair = client.models.generate_content(
+        model=model_name,
+        contents=repair_prompt,
+        config=types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=3000
+        )
+    )
+    return _parse_json_strict_then_loose(repair.text)
+
+
 def get_or_generate_business_status(company):
     """
     Return the stored overview if it is still current (doc count unchanged).
@@ -116,6 +161,12 @@ def generate_business_status(company):
     doc_blocks = []
     for i, doc in enumerate(documents, 1):
         content = doc.content_summary or doc.content_extracted or ''
+        if not content.strip():
+            try:
+                process_document(doc)
+                content = doc.content_summary or doc.content_extracted or ''
+            except Exception:
+                content = ''
         if content.strip():
             # Limit each document to 3000 chars to stay within token limits
             snippet = content.strip()[:3000]
@@ -146,16 +197,11 @@ def generate_business_status(company):
             )
         )
 
-        raw = response.text.strip()
-
-        # Strip markdown code fences if present
-        if raw.startswith('```'):
-            raw = raw.split('```')[1]
-            if raw.startswith('json'):
-                raw = raw[4:]
-            raw = raw.strip()
-
-        result = json.loads(raw)
+        raw = response.text or ''
+        try:
+            result = _parse_json_strict_then_loose(raw)
+        except json.JSONDecodeError:
+            result = _repair_json_response(client, model_name, raw)
         result['documents_analysed'] = len(doc_blocks)
         result['company_name'] = company.name
         result['company_stage'] = company.stage

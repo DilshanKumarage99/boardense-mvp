@@ -13,7 +13,6 @@ export default function CompanyDashboard() {
   const [documents, setDocuments] = useState([]);
   const [selectedDocs, setSelectedDocs] = useState([]);
   const [currentFiles, setCurrentFiles] = useState([]);
-  const [documentType, setDocumentType] = useState('board_deck');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null); // {id, filename, content_extracted, content_summary}
@@ -163,7 +162,7 @@ export default function CompanyDashboard() {
       const formData = new FormData();
       currentFiles.forEach((file) => {
         formData.append('files', file);
-        formData.append('types', documentType);
+        formData.append('types', 'general');
       });
 
       const uploadRes = await axios.post(
@@ -220,26 +219,11 @@ export default function CompanyDashboard() {
             <h2 className="text-xl font-bold mb-4 flex items-center justify-center gap-2"><FaUpload /> Upload Document</h2>
             
             <div className="mb-4">
-              <label className="block text-sm font-semibold mb-2">Document Type</label>
-              <select
-                value={documentType}
-                onChange={(e) => setDocumentType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded"
-              >
-                <option value="board_deck">Board Deck</option>
-                <option value="strategy_doc">Strategy Document</option>
-                <option value="okr">OKRs</option>
-                <option value="decision_note">Decision Note</option>
-                <option value="general">General Document</option>
-              </select>
-            </div>
-
-            <div className="mb-4">
               <input
                 type="file"
                 multiple
                 onChange={handleSelectFiles}
-                accept=".pdf,.docx,.txt"
+                accept=".pdf,.docx,.txt,.xlsx,.xls"
                 className="w-full"
               />
             </div>
@@ -663,7 +647,7 @@ export default function CompanyDashboard() {
         </div>
 
         {/* Reports Section */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mt-8 grid grid-cols-1 gap-4">
           <button
             onClick={() => navigate(`/reports/${companyId}/exit-readiness`)}
             className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 border-l-4 border-brand-orange text-center"
@@ -673,16 +657,6 @@ export default function CompanyDashboard() {
               <h3 className="text-xl font-bold">Exit Readiness Report</h3>
             </div>
             <p className="text-gray-600">Assess governance maturity and due diligence readiness</p>
-          </button>
-          <button
-            onClick={() => navigate(`/company/${companyId}/renewal-os`)}
-            className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all duration-300 hover:scale-105 border-l-4 border-purple-500 text-center"
-          >
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <FaSync className="text-purple-500" />
-              <h3 className="text-xl font-bold">Renewal OS Report</h3>
-            </div>
-            <p className="text-gray-600">Assess organizational renewal capability across 4 dimensions</p>
           </button>
         </div>
       </div>
