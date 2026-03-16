@@ -238,7 +238,7 @@ export default function CompanyDashboard() {
         </div>
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">{company?.name}</h1>
-          <p className="text-gray-600">Stage: {company?.stage} | Industry: {company?.industry}</p>
+          <p className="text-gray-600">Industry: {company?.industry}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

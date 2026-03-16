@@ -204,7 +204,6 @@ def generate_business_status(company):
             result = _repair_json_response(client, model_name, raw)
         result['documents_analysed'] = len(doc_blocks)
         result['company_name'] = company.name
-        result['company_stage'] = company.stage
         result['company_industry'] = company.industry
         return result
 
@@ -219,7 +218,6 @@ def generate_business_status(company):
 def _empty_status(company, reason="No data available."):
     return {
         'company_name': company.name,
-        'company_stage': company.stage,
         'company_industry': company.industry,
         'business_summary': reason,
         'financial_health': None,
@@ -237,7 +235,6 @@ def _fallback_status(company, documents, reason='AI analysis unavailable'):
     """Basic fallback when Gemini is unavailable."""
     return {
         'company_name': company.name,
-        'company_stage': company.stage,
         'company_industry': company.industry,
         'business_summary': f'Business status based on {len(documents)} submitted document(s). AI analysis unavailable — {reason}.',
         'financial_health': {

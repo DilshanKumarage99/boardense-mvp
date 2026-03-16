@@ -133,7 +133,6 @@ export default function Dashboard() {
                   className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-105 border-l-4 border-brand-orange text-center"
                 >
                   <h3 className="text-xl font-bold mb-2">{company.name}</h3>
-                  <p className="text-gray-600">Stage: {company.stage}</p>
                   <p className="text-gray-600">Industry: {company.industry}</p>
                 </div>
               ))

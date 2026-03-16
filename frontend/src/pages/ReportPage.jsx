@@ -132,7 +132,7 @@ export default function ReportPage() {
             {/* Title + Score Hero */}
             <div className="bg-white rounded-lg shadow-lg p-8 text-center">
               <h1 className="text-3xl font-bold text-gray-800 mb-2">Exit Readiness Report</h1>
-              <p className="text-gray-500 mb-1">{report.company_name} · {report.company_stage} · {report.company_industry}</p>
+              <p className="text-gray-500 mb-1">{report.company_name} · {report.company_industry}</p>
               <div className="flex items-center justify-center gap-3 mb-6 text-sm text-gray-400">
                 <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">
                   Based on {report.documents_analysed} document{report.documents_analysed !== 1 ? 's' : ''}

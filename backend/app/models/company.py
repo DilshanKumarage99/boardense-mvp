@@ -38,7 +38,6 @@ class Company(db.Model):
             'id': self.id,
             'name': self.name,
             'description': self.description,
-            'stage': self.stage,
             'industry': self.industry,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()

@@ -11,7 +11,7 @@ EXIT_READINESS_PROMPT = """You are a senior M&A advisor and due diligence expert
 
 Analyse all the documents below and produce a comprehensive Exit Readiness Report in structured JSON.
 
-COMPANY: {company_name} | STAGE: {company_stage} | INDUSTRY: {company_industry}
+COMPANY: {company_name} | INDUSTRY: {company_industry}
 
 SUBMITTED DOCUMENTS:
 {documents}
@@ -205,7 +205,6 @@ def generate_exit_readiness(company):
     combined = "\n\n".join(doc_blocks)
     prompt = EXIT_READINESS_PROMPT.format(
         company_name=company.name,
-        company_stage=company.stage or 'Unknown',
         company_industry=company.industry or 'Unknown',
         documents=combined
     )
@@ -234,7 +233,6 @@ def generate_exit_readiness(company):
           result = _repair_json_response(client, model_name, raw)
         result['documents_analysed'] = len(doc_blocks)
         result['company_name'] = company.name
-        result['company_stage'] = company.stage
         result['company_industry'] = company.industry
         return result
 
@@ -249,7 +247,6 @@ def generate_exit_readiness(company):
 def _empty_report(company, reason="No data available."):
     return {
         'company_name': company.name,
-        'company_stage': company.stage,
         'company_industry': company.industry,
         'overall_readiness_score': 0,
         'readiness_verdict': 'Not Ready',
@@ -268,7 +265,6 @@ def _empty_report(company, reason="No data available."):
 def _fallback_report(company, documents, reason='AI analysis unavailable'):
     return {
         'company_name': company.name,
-        'company_stage': company.stage,
         'company_industry': company.industry,
         'overall_readiness_score': 0,
         'readiness_verdict': 'Unknown',

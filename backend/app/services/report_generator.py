@@ -28,7 +28,6 @@ def generate_exit_readiness_report(company):
     
     return {
         'company_name': company.name,
-        'stage': company.stage,
         'industry': company.industry,
         'readiness_score': readiness_score,
         'timestamp': datetime.utcnow().isoformat(),

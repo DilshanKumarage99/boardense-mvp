@@ -19,7 +19,6 @@ def create_company():
     company = Company(
         name=data['name'],
         description=data.get('description', ''),
-        stage=data.get('stage', 'seed'),
         industry=data.get('industry', ''),
         created_by=user_id
     )
@@ -63,7 +62,6 @@ def update_company(company_id):
     data = request.get_json()
     company.name = data.get('name', company.name)
     company.description = data.get('description', company.description)
-    company.stage = data.get('stage', company.stage)
     company.industry = data.get('industry', company.industry)
     
     db.session.commit()
