@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect, useRef, useCallback } from 'rea
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
-import { FaUpload, FaFileAlt, FaClipboardCheck, FaArrowLeft, FaBuilding, FaSync, FaComments, FaPaperPlane, FaSpinner } from 'react-icons/fa';
+import { FaUpload, FaFileAlt, FaClipboardCheck, FaArrowLeft, FaBuilding, FaSync, FaComments, FaPaperPlane, FaSpinner, FaTrash } from 'react-icons/fa';
 
 export default function CompanyDashboard() {
   const { companyId } = useParams();
@@ -15,6 +15,7 @@ export default function CompanyDashboard() {
   const [currentFiles, setCurrentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [deletingCompany, setDeletingCompany] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null); // {id, filename, content_extracted, content_summary}
   const [summarizing, setSummarizing] = useState(false);
   const [businessStatus, setBusinessStatus] = useState(null);
@@ -96,6 +97,26 @@ export default function CompanyDashboard() {
       alert(`Deleted ${deleted.length} document(s)`);
     } catch (err) {
       alert('Batch delete failed: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!company) return;
+
+    const confirmed = window.confirm(
+      `Delete company "${company.name}"? This will permanently remove the company and all related documents, analyses, decisions, and risks.`
+    );
+    if (!confirmed) return;
+
+    setDeletingCompany(true);
+    try {
+      await axios.delete(`/api/companies/${companyId}`);
+      alert('Company deleted');
+      navigate('/dashboard');
+    } catch (err) {
+      alert('Delete failed: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setDeletingCompany(false);
     }
   };
 
@@ -200,12 +221,19 @@ export default function CompanyDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-8">
-        <div className="mb-4 flex justify-center">
+        <div className="mb-4 flex justify-center gap-3">
           <button
             onClick={() => navigate('/dashboard')}
             className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 flex items-center gap-2"
           >
             <FaArrowLeft /> Back to Dashboard
+          </button>
+          <button
+            onClick={handleDeleteCompany}
+            disabled={deletingCompany}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            <FaTrash /> {deletingCompany ? 'Deleting...' : 'Delete Company'}
           </button>
         </div>
         <div className="mb-8 text-center">
